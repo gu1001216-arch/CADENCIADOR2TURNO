@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerador de Etiqueta Déccio (Manual)</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        label { display: block; margin-top: 10px; font-weight: bold; }
+        input[type="text"], input[type="number"], input[type="date"] { 
+            width: 300px; padding: 8px; margin-bottom: 15px; border: 1px solid #ccc; 
+        }
+        .btn-group button { padding: 10px 20px; background-color: #007bff; color: white; border: none; cursor: pointer; margin-right: 10px; }
+        .btn-group button:hover { background-color: #0056b3; }
+        #btnImprimir { background-color: #28a745; }
+        #btnImprimir:hover { background-color: #1e7e34; }
+
+        textarea { width: 100%; height: 200px; margin-top: 20px; font-family: monospace; font-size: 12px; border: 1px solid #000; padding: 10px; }
+        .input-section { margin-bottom: 30px; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9; }
+        #preview-frame { border: 1px solid #000; width: 500px; height: 350px; margin-top: 20px; }
+        .flex-container { display: flex; gap: 20px; }
+        .column { flex: 1; }
+    </style>
+</head>
+<body>
+
+    <h1>🏷️ Gerador de Etiqueta Déccio (Manual)</h1>
+
+    <div class="input-section">
+        <h2>Dados Variáveis da Etiqueta</h2>
+        
+        <div class="flex-container">
+            <div class="column">
+                <label for="part_description">PART DESCRIPTION:</label>
+                <input type="text" id="part_description" value="ROTOR ASSEMBLY" required>
+
+                <label for="part_number">PART NUMBER (Cód. Barras 1):</label>
+                <input type="text" id="part_number" value="1234567890" required>
+
+                <label for="item">ITEM:</label>
+                <input type="text" id="item" value="001" required>
+
+                <label for="po_number">PO NUMBER (Cód. Barras 2):</label>
+                <input type="text" id="po_number" value="9876543210" required>
+            </div>
+            <div class="column">
+                <label for="pack_date">PACK DATE (XX/XX/XX):</label>
+                <input type="date" id="pack_date" value="2025-12-08" required>
+
+                <label for="quantity">QUANTITY (XX):</label>
+                <input type="number" id="quantity" value="150" min="1" required>
+
+                <label for="weight">WEIGHT (XX):</label>
+                <input type="text" id="weight" value="25.5 KG" required>
+                
+                <label for="qtd_etiquetas">Quantidade de Etiquetas (PQ):</label>
+                <input type="number" id="qtd_etiquetas" value="1" min="1" required>
+            </div>
+        </div>
+        
+        <div class="btn-group">
+            <button onclick="gerarZPL()">Gerar ZPL e Pré-visualização</button>
+            <button id="btnImprimir" onclick="enviarParaImpressora()">Imprimir ZPL (Requer Servidor Local)</button>
+        </div>
+    </div>
+
+    <div class="flex-container">
+        <div class="column">
+            <h2>Pré-visualização (Labelary)</h2>
+            <iframe id="preview-frame" src="" frameborder="0"></iframe>
+            <p style="font-size: 0.8em;">A pré-visualização requer o serviço Labelary e conexão com a internet.</p>
+        </div>
+        <div class="column">
+            <h2>Código ZPL Final para Impressão</h2>
+            <textarea id="zplOutput" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        // Bloco ZPL_BASE_GRAPHICS (mantido do arquivo original)
+        const ZPL_BASE_GRAPHICS = `
+^MMT
+^PW799
+^LL0400
+^LS0
+^FO320,64^GFA,00640,00640,00020,:Z64:eJxjYKADsG948F/+h4Rk4xyZ//w//0HEDjz4P/+HDFis/+d/sJjBww0HDzbISTbOsznYw9jcABZL3HAAIdbYg1AnLdk4SwekDixmf1jif2OD5MzG2TlAOyDm2TdL/GOEivX//AOxg/nHccYGiZtAsQNnGPsgYux/Djc2SFQ2zjwDFGuHiLHxHASJHQaLNcPFDjZIWPyXPAM0D2KvAQ/bgYcNEhJ1Ej1AexvP0CM8hxEAAAaLXNs=:E02B
+^FO352,224^GFA,01024,01024,00016,:Z64:eJxjYBgFtAZ2PDwyEtL/8/8zQ/j/e3hkZED8dgj/YA+PmZyEQcLBNjCXseEMhH/gjAGcL43KT5acAeRXMKDyDeD8eokbCH7vGZ7/MyrgfIbjfTIHkfn/238cnGEB4kMEbJs/NtyQQPAZDtAubEbBwAIA6Z81IA==:D8B8
+^FO352,192^GFA,01280,01280,00020,:Z64:eJxjYBgFIxAw/mFn+JGQYN9Q8P/+B5jYP3bmPwkH7B8gi7XzNvMlNhgk3OCRgOtt5m1nSWYwMACKMTbA1bUxpKGJ/ZM4xpDPYGDYwyMPN+8PUKwaTaxB/hhDYYOB4R8kOxrsn7MkHjAw/ocsZpDMl3DAIJkNVewP0B+P2XjkP8LsbUgwAPmtjRkhNgpAVYAAJH2NyQ=:9E0B
+^FO320,32^GFA,00768,00768,00024,:Z64:eJzt0D0OgjAUB/ASDSxG1zL1CmVzMOEqJSZ6A9c+QoILHsCJK+ANaEjwGhATdjYSiLUtqKMTm2/85eV9/BGauXyoJOmIkBvoeMxJ74gQtOeVTDvSSlIMvORpT1qhndaZEIA92D7WrAlEhL3aeJDlyl2gxyU7MBFRt06+/S7sbGT6qXvT7hdYhsoliZGaHyq/mr0RflranRJxm1tvp4vurh1Qg/Yx034x7gxFOO0NSuNn4/ZKPTLdqR17Hxcw/sUa5aSNzJ0rO69hzIGdlKsckrnD/9evegGrn2/5:B726
+^FO320,96^GFA,01024,01024,00016,:Z64:eJxjYBgFowAPsG/4wdg4Q/Lg+Q//5z8A8Q//YzwI4v/4P/8DkG/wmI3x4QzJx2ckDkhYgPhpzHC+xAEg/xkz48YZkovA8kC+/TFmxpkzJLeBzAPpt2+D8oHmHQDpZ2Nm7AXyz/AckHgA5bfPkJwD4heA+MzsjO1zLMF8AzD/H2Nz/8c5QP0zQOYbMADd2/6wA2j+DJkDAxBgQwsAALmxTJ8=:754F
+^FO320,96^GFA,00256,00256,00008,:Z64:eJxjYCAAzP/9nyODRBskHJCzgdEJYFpKB0z/n53DgEwfkIbSkmdQ6P8zz0DUz+hJIGQ7zQEAG6gdVw==:17C8
+^FO352,256^GFA,01024,01024,00016,:Z64:eJxjYBgFVAbM7Gz/Z9jz8P7vgPLb+f7P+N8D5zP29xyQOHiGRwKqnrG354DkgR4eCQkkfgMPnM9w98b/mQ38f2BchhtAfvt5ZP4ByXaEeQwVP4DmIfELClDsA/KB7jmDMB/Et0eybxSMHAAAuSQwIA==:9185
+^FO0,0^GFA,02688,02688,00028,:Z64:eJztVDFu4zAQXBM2fFB3heBKOCDVga9gnelTmFATw1+4Iokb46T6XuFS0CvyhDQp/YcUDhQ6e0uaokUFAZIyXtmza64G4yV3SfRtbGqcNyO5rE6WJtbaGwSFX8j7nGrZhHfi97n58dh10Cj9wmLA23Gg/YLuc7M92xMHt36hiHjN/7ZtOGhG9A5LW275//71C7YvUO2gycEuKY9mrDVZ8fcpzYFHzFN1mpu/MFTsTZpTvjaVpkSPViOJiDdmTs/Q9dKQ+cMwJYl7Xk0aNQKUc0Gv4BJ5UyfYWR9HPIVNFcicC3olLY7dgRbdkYGPtHuNeRlOX0A7F+kVz3bvgXK4iMf/tEWrMcDxT+jh3NaosDICa374E/OwOdpF+tSsXm8VAA8Vj+e8zEHW86S+NW24MY3AwsWjvHG9muGni/MxPfTnQM9sZ/eV+YeFX6Ya6vHmO96IHs9FLSPhtB9DY+j6d+BFelOS87ubbzbmAbGrL+Zppa5oqEdBw49gVN+J5yjnemIVbeG4vtxE9VHQIBrup9iKZCtRmEnqw7s/kvPzelV0fuWZXntqlbRfJvvv+0U1MkkOpD/9+b1aWx5MtbyuaNmA/oQTHu4z5rU8dA54HvwA+vusYPRAOVzg7TA7jYdo/roO9ye7OwDmb4ZZDDyUiEsUoH1M/X1tLUNu5b6G+5SZD9+42MUu9mV7A2NOoos=:0CDB
+^FO0,32^GFA,02688,02688,00028,:Z64:eJzt0L0KwjAQwPELhXYJuipU+woNLoqDryI4uAki6Ni6OPVjdfBhWgqXpW+gCCI4CVoKuomB2lJEi6uQ/5KQH5fhAGQymeyXgmFxVZUytIUFADUgoThUFUArjAKENohncgiIrdLyHJ1oaCa3s04OYXRcMZdjvZab1UK25fGcpNHCQ+a7aPRzmzWQLTnVSIod+8S8BpqK/bLRGlmIwu48Fea8mTlFapEHKn5mg7I1kY7JHhUns05hG57ZjgvrOTp2c2uP/Ci53sSfcZRcToZTRyP/88MKq9b7nYyqOZlMJvvDnpoRWfo=:67E5
+^FO0,320^GFA,01280,01280,00020,:Z64:eJxjYBgFwwews/PJt38w5uF//MPifxpUrJ9P/vgH4x7+z3+QxKQlnjEYn+Ex55lg4qxdUtLpEHFeGBit6Ul0j8Y5wDNy5GAixnOAIt9/nAMLhZsPwOo14bH2OKfAUys2H7GM7CYxL8EuFjCfaBbZPg/yzb/T/8AEVNOuA9xMz9cbBSMAvoAAJCdN6I=:88BB
+^FO0,64^GFA,05120,05120,00040,:Z64:eJzt1sGL4lYcB/DYB5keQty5vWDYTOmp0EPSFFcZaebS9tbz3poQcC9T1mGgnVLRSJZ4CXorFpb1X6gsFIqHjRtILunMVejCOBX0UpbYwJLBTKbv6cysjtqRnqbd+R6Sn/rR936/iJEg7nKXu9zmULMP5NUOzj6w/vVykVQ1OMITfZuTjh0W6M3jvkEyEUfl6IR+FrIXLpbqjqQdiqEtvTgesMCdulgyS9hFl87l2cGedSSytmDAfBq4DUA6JGPsecNUQlNq6Qtn8/ALGTnK5knsPr9wsvkSO+PKSQ1Stn57TtkSyTlp8E3Txi6SKWuF4wzOULG38iQTqp4lVJBT59b1AspOGIxTBh81QHJAMk9V76WEXXmuDy9gh6gP5LLYbWTNgjfErnbppnPx9sOSZMBBR882bfggGNXQXOROpEQd7dqccxwJv+3om9iNTqpoztiFl+4dSyLOqEAiPjgxSmALnPZo+n6iNwq/ommO+D667jR1hC4FD8Y+x0lgdBp+jc7a2Ywj+N00EKwvswMVbGoi3G639NRPWrvdblU8OOdYwFvOJnKM9iEUWsgBv9VqVSravUWX+KUMIKGGQuuFPg5C5KqJkJ91zoUrIacg16yMxwz62EozmnPxdN1nsgqJHbRuRUtB7FpNc2vO4T7c7MTZme32c307xWy3279WTHnGCTqeiz2qyWUGnZqclBqN/+JQiGjBEZ0TQ/6M0TonNfo+0xv9QaMQB7Numh18uLfw9EIm7+RvQChbV4fbljhZ7RXlbiHZD/kCjyadSZI0wXkiFSX13lt3zrl+LDQKySAqhAXCyR1wNQ47M0avvHV2ZpB1hUaXEqnRK5/wcgfCs20NUqLnZgYzk7L5PKNPXcv8meh++hD4UZg49Mrs/rBLwS7an2DyRJTuAlLQOFPctflHM/uLJo4xk4GP3Z/pLnnl1Jn9HU5dRIkZ7JxPGhQ5WTdn8/LM/hzcB40dFF4hJzYgifqg93Pzfbh4LnSKTAYsH/KWLTYkg4Nwo89em0sdzRm7Po3mbNkClAwaQmBfm/N8dqan91dfv2m06WmNb+xtSyQEZ9HjkY/ubxQuFXu5i8XxWfw4CKm+ZOJylXNFqBhKlaUCwcOlqi53tkggZ1BUwHu4XO18JcLud+RQudIJoRJeOFzmxRWOh8pT7I54D5ePgtV9mLiPI+FwH5WrXCyGSk3RQ8qVqn1U7qbCpS4SfKWqVPCcQQeVq9y7liKb1Ehuw/UT/gFRLMIMBU461qKLWc4ipfrQB2FExHGmyG4E/d6ic9KZHrnn5QnAHBKOc/A6Rz74rrDorDQvk7JHEiDxBLmHzsdkOr3kThJN3JHrg5GG9+fsgsEyV3Kxc4d+4nTqvB+WOrLMy45soZ9YBq8Lnbi0dF2nnOk5b/uAr+PlfcSdpoX+Aw4DNBc5jmGRWj6XYqeuFdGcAzRn+R/mfJkEsd4N8z3i6lfyP5lY0utv5JvduWSv5WzesfJrOmcNF0tGx1jDnUuUso6zxXqfXMcJ9cE67lzoSm/KN7uYD9dyd/kf528GpG5U:F21F
+^FO480,32^GFA,00512,00512,00016,:Z64:eJxjYKAUMLMlnJFsNkjjOTjDAMzvKzxnedziuczjOQUgPmOPYZvBMYnDEsk8CWANN6SZE3J4GzeYsR0A83/IMz+o4W/8YMcO4RfwMR6wYMd4IMPcgJWPrh7NPHT70N2D7t6RDQA/MTPN:A517
+^FO448,64^GFA,00512,00512,00016,:Z64:eJxjYKAyYGw2SOM5OMOYLeGMZDOIf9ziuczjOcV9hecsj4MUHJM4LJHMk9hj2GZwDMTP4W3cYMZ24IY0c0IOiF/D3/jBjv3AD3nmBzUgvgU7wwMZ5oYCPsYDFtj46OrRzUOzD9096O4dYQAAe3g6MQ==:1C30
+^FO416,96^GFA,01024,01024,00016,:Z64:eJxjYBgFowAvYOM5OMOYLeGMZLNBAojPLvN4TnFf4TnL4xYPQHxmiWSexB7DNoNjEgdAfMYNZmwHbkgzJ+TwNoD5H+zYD/yQZ35Qww/mMzyQYW4o4GM8YMHOgI2Prh7dPHT70N2D7t5RgAcAAI31M80=:8B37
+^FO352,96^GFA,00512,00512,00016,:Z64:eJxjYKAYSBizJZyRbDZI4znYAOLLFPcVnrM8bvFc5jGYz5PYY9hmcEzisEQyWD3bgRvSzAk5vI0bzMB89gM/5Jkf1PA3frAD85kbCvgYD1iwMzyQwcpHV49uHrp96O5Bd++IBgAgeTPN:7F2E
+^FO480,192^GFA,00768,00768,00012,:Z64:eJxjYBgFxIOEMxI5ks28zQYJDAyF5yzyLI/zHrd4wMBg2GZwzOCYxDGJAwwM0swJhxNyJHJ4GxgY5JkfHH5QI1HDD2TzMR44eMBCwoKdAcQ+2HjAwgDMlmd+2PygxgCsRpo5sTkhxwCs17ANauoBkF3WfJbHE8F2JZyR5pFsTgS7YRRQCgCcry0B:7771
+^FO448,224^GFA,00512,00512,00008,:Z64:eJxjYBhyQMKYDUzLFPeBaZ7EHjDNduAGmGY/8ANMMzcUoNAwcZg6mD6YOTBzRxQAABiBDW8=:0B7C
+^FO448,256^GFA,00512,00512,00008,:Z64:eJxjYBgigLHZIAFMH7d4ABY4JnEATOfwNoDpGn4IbcHOgELDxGHqoPpg5sDMHaEAAN2DDas=:F43A
+`;
+
+        function formatarData(dataISO) {
+            if (!dataISO) return "XX/XX/XX";
+            const [ano, mes, dia] = dataISO.split('-');
+            return `${dia}/${mes}/${ano.slice(-2)}`;
+        }
+
+        function gerarZPL() {
+            // ... (Função de coleta de dados e geração de ZPL, a mesma da resposta anterior) ...
+            const description = document.getElementById('part_description').value.toUpperCase().trim();
+            const part_number = document.getElementById('part_number').value.toUpperCase().trim();
+            const item = document.getElementById('item').value.toUpperCase().trim();
+            const po_number = document.getElementById('po_number').value.toUpperCase().trim();
+            const pack_date_iso = document.getElementById('pack_date').value;
+            const quantity = document.getElementById('quantity').value.toUpperCase().trim();
+            const weight = document.getElementById('weight').value.toUpperCase().trim();
+            const qtd_etiquetas = parseInt(document.getElementById('qtd_etiquetas').value, 10);
+            
+            const pack_date_formatada = formatarData(pack_date_iso);
+
+            if (!description || !part_number || !item || !po_number || !pack_date_iso || !quantity || !weight || isNaN(qtd_etiquetas) || qtd_etiquetas < 1) {
+                alert("Por favor, preencha todos os campos e a quantidade é válida.");
+                return ""; // Retorna string vazia se inválido
+            }
+            
+            const font = '^A0N,25,25';
+            
+            const descZPL = `^FO420,55${font}^FDPART DESCRIPTION: ${description}^FS`; 
+            const pnTextZPL = `^FO420,105${font}^FDPART NUMBER: ${part_number}^FS`; 
+            const itemZPL = `^FO420,155${font}^FDITEM: ${item}^FS`;
+            const poTextZPL = `^FO420,205${font}^FDPO NUMBER: ${po_number}^FS`;
+            const dateZPL = `^FO420,300${font}^FDPACK DATE: ${pack_date_formatada}^FS`;
+            const quantityZPL = `^FO420,350${font}^FDQUANTITY: ${quantity}^FS`;
+            const weightZPL = `^FO420,400${font}^FDWEIGHT: ${weight}^FS`;
+
+            const pnBarcodeZPL = `^FO420,135^BCN,60,Y,N,N,A^FD${part_number}^FS`;
+            const poBarcodeZPL = `^FO420,235^BCN,60,Y,N,N,A^FD${po_number}^FS`;
+
+            const finalZPL = 
+`CT~~CD,~CC^~CT~
+^XA~TA000~JSN^LT0^MNW^MTD^PON^PMN^LH0,0^JMA^PR2,2~SD15^JUS^LRN^CI0
+^XA
+${ZPL_BASE_GRAPHICS} 
+${descZPL}
+${pnTextZPL}
+${pnBarcodeZPL}
+${itemZPL}
+${poTextZPL}
+${poBarcodeZPL}
+${dateZPL}
+${quantityZPL}
+${weightZPL}
+
+^PQ${qtd_etiquetas},0,1,Y^XZ`;
+
+            document.getElementById('zplOutput').value = finalZPL;
+            gerarPreview(finalZPL);
+            return finalZPL;
+        }
+
+        function gerarPreview(zplCode) {
+            if (!zplCode) return;
+            const encodedZPL = encodeURIComponent(zplCode);
+            const labelaryUrl = `http://api.labelary.com/v1/viewer?zpl=${encodedZPL}&dpmm=8&width=5&height=3`;
+            document.getElementById('preview-frame').src = labelaryUrl;
+        }
+
+        // --- FUNÇÃO PRINCIPAL DE IMPRESSÃO ---
+        async function enviarParaImpressora() {
+            const zplCode = gerarZPL();
+            if (!zplCode) return;
+            
+            // Defina o IP da sua impressora
+            const PRINTER_IP = '192.168.1.100'; // Substitua pelo IP da sua impressora Zebra
+            // Defina a porta de comunicação de dados brutos (padrão Zebra)
+            const PRINTER_PORT = 9100;
+
+            alert("ATENÇÃO: A impressão direta de ZPL via navegador requer um serviço intermediário (como um servidor local ou um aplicativo de ponte). O navegador não pode enviar dados brutos via TCP/IP diretamente por segurança.");
+
+            // Opção 1: Enviar para um endpoint do seu servidor (Recomendado)
+            // Se você tiver um servidor backend (Node, Python, PHP) rodando localmente
+            // que está configurado para abrir o socket TCP/IP.
+            
+            try {
+                // Exemplo de como você FARIA se tivesse um servidor local na porta 3000
+                const response = await fetch('http://localhost:3000/imprimir_zebra', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                    // O servidor deve usar o IP e a Porta definidos acima (192.168.1.100:9100)
+                    body: zplCode 
+                });
+
+                if (response.ok) {
+                    // alert('Comando ZPL enviado com sucesso para o servidor!');
+                    console.log('Comando ZPL enviado com sucesso para o servidor.');
+                } else {
+                    alert('Erro ao enviar ZPL para o servidor. Verifique se o servidor local está ativo.');
+                }
+            } catch (error) {
+                console.error('Falha na comunicação com o servidor local:', error);
+                alert(`Erro de conexão com o servidor local. Verifique se o backend está ativo e o IP da impressora está correto: ${PRINTER_IP}:${PRINTER_PORT}`);
+            }
+
+            // Opção 2: Solução ZPL/JavaScript usando a porta padrão do navegador (Muito Limitado e não recomendado)
+            // window.print(); // Isto apenas tenta imprimir a página HTML, não o ZPL.
+        }
+
+        document.addEventListener('DOMContentLoaded', gerarZPL);
+    </script>
+</body>
+</html>
