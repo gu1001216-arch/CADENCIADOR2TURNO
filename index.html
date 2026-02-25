@@ -583,8 +583,8 @@
         
     ];
 
-    // DADOS PADRÃO (Serão substituídos se houver dados salvos no localStorage)
-     const PRODUTOS_PADRAO = [
+       // DADOS PADRÃO (Serão substituídos se houver dados salvos no localStorage)
+    const PRODUTOS_PADRAO = [
         // Lista completa de produtos e seus Tact Times em minutos
         { nome: 'PATCH PANEL PPD24', tactTime: 15 },
         { nome: 'PATCH PANEL PPDB24', tactTime: 15 },
@@ -592,6 +592,7 @@
         { nome: 'RACK MRD 5U 470MM', tactTime: 10.5 },
         { nome: 'RACK MRD 8U 470MM', tactTime: 11 },
         { nome: 'RACK MRD 12U 470MM', tactTime: 11.5 },
+          { nome: 'RACK MRD 16U 470MM', tactTime: 8 },
         { nome: 'RACK MRD 3U BS', tactTime: 10.5 },
         { nome: 'RACK MRD 5U BS', tactTime: 10.5 },
         { nome: 'RACK MRD 8U BS', tactTime: 11 },
@@ -651,9 +652,11 @@
         { nome: 'CONJUNTO FRENTE FALSA (5ND)', tactTime: 20 },
         { nome: 'RACK MRM 3U ', tactTime: 6.25 },
         { nome: 'RACK MRM 5U', tactTime: 6.25 },
+         { nome: 'CAIXA ORG LIGHT', tactTime: 6 },
         { nome: 'CAIXA ORG. PRETA', tactTime: 4.333 },
         { nome: 'CAIXA ORG. BRANCA', tactTime: 4.333 },
     ];
+    
     
     // Variável que armazena os produtos com os Takt Times ATIVOS (será carregada na inicialização)
     let PRODUTOS = []; 
@@ -2000,6 +2003,7 @@
 </script>
 </body>
 </html>
+
 
 
 
